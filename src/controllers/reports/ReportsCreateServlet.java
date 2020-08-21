@@ -2,6 +2,7 @@ package controllers.reports;
 
 import java.io.IOException;
 import java.sql.Date;
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.List;
 
@@ -54,6 +55,12 @@ public class ReportsCreateServlet extends HttpServlet {
 
             r.setTitle(request.getParameter("title"));
             r.setContent(request.getParameter("content"));
+            String start_time = request.getParameter("start_time");
+            System.out.println("出勤時間　" + start_time);
+            String end_time = request.getParameter("end_time");
+            System.out.println("出勤時間　" + end_time);
+            r.setStart_time(Time.valueOf(start_time + ":00"));
+            r.setEnd_time(Time.valueOf(end_time + ":00"));
 
             Timestamp currentTime = new Timestamp(System.currentTimeMillis());
             r.setCreated_at(currentTime);
