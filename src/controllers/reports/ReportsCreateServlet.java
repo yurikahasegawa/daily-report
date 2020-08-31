@@ -1,5 +1,5 @@
 package controllers.reports;
-
+import java.io.File;
 import java.io.IOException;
 import java.sql.Date;
 import java.sql.Time;
@@ -9,23 +9,25 @@ import java.util.List;
 import javax.persistence.EntityManager;
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
+import javax.servlet.annotation.MultipartConfig;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.Part;
 
 import models.Employee;
 import models.Report;
 import models.validators.ReportValidator;
 import utils.DBUtil;
-
+import utils.EncryptUtil;
 /**
  * Servlet implementation class ReportsCreateServlet
  */
+@MultipartConfig
 @WebServlet("/reports/create")
 public class ReportsCreateServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
-
     /**
      * @see HttpServlet#HttpServlet()
      */
@@ -33,59 +35,78 @@ public class ReportsCreateServlet extends HttpServlet {
         super();
         // TODO Auto-generated constructor stub
     }
-
     /**
      * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
      */
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        String _token = (String)request.getParameter("_token");
-        if(_token != null && _token.equals(request.getSession().getId())) {
-            EntityManager em = DBUtil.createEntityManager();
-
-            Report r = new Report();
-
-            r.setEmployee((Employee)request.getSession().getAttribute("login_employee"));
-
-            Date report_date = new Date(System.currentTimeMillis());
-            String rd_str = request.getParameter("report_date");
-            if(rd_str != null && !rd_str.equals("")) {
-                report_date = Date.valueOf(request.getParameter("report_date"));
-            }
-            r.setReport_date(report_date);
-
-            r.setTitle(request.getParameter("title"));
-            r.setContent(request.getParameter("content"));
-            String start_time = request.getParameter("start_time");
-            System.out.println("出勤時間　" + start_time);
-            String end_time = request.getParameter("end_time");
-            System.out.println("出勤時間　" + end_time);
-            r.setStart_time(Time.valueOf(start_time + ":00"));
-            r.setEnd_time(Time.valueOf(end_time + ":00"));
-
-            Timestamp currentTime = new Timestamp(System.currentTimeMillis());
-            r.setCreated_at(currentTime);
-            r.setUpdated_at(currentTime);
-
-            List<String> errors = ReportValidator.validate(r);
-            if(errors.size() > 0) {
-                em.close();
-
-                request.setAttribute("_token", request.getSession().getId());
-                request.setAttribute("report", r);
-                request.setAttribute("errors", errors);
-
-                RequestDispatcher rd = request.getRequestDispatcher("/WEB-INF/views/reports/new.jsp");
-                rd.forward(request, response);
-            } else {
-                em.getTransaction().begin();
-                em.persist(r);
-                em.getTransaction().commit();
-                em.close();
-                request.getSession().setAttribute("flush", "登録が完了しました。");
-
-                response.sendRedirect(request.getContextPath() + "/reports/index");
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        String _token = (String) request.getParameter("_token");
+        if (_token != null && _token.equals(request.getSession().getId())) {
+            // 画像アップロード
+            Part part = request.getPart("image");
+            if (part.getSize() != 0) {
+                String filename = getFileName(part);
+                String filePath = getServletContext().getRealPath("/uploads/") + filename;
+                File uploadDir = new File(getServletContext().getRealPath("/uploads/"));
+                if (!uploadDir.exists()) {
+                    uploadDir.mkdir();
+                }
+                part.write(filePath);
+                // 以下、データベースに保存
+                EntityManager em = DBUtil.createEntityManager();
+                Report r = new Report();
+                r.setEmployee((Employee) request.getSession().getAttribute("login_employee"));
+                Date report_date = new Date(System.currentTimeMillis());
+                String rd_str = request.getParameter("report_date");
+                if (rd_str != null && !rd_str.equals("")) {
+                    report_date = Date.valueOf(request.getParameter("report_date"));
+                }
+                r.setReport_date(report_date);
+                r.setTitle(request.getParameter("title"));
+                r.setContent(request.getParameter("content"));
+                r.setImage(filename); // 追加
+                String start_time = request.getParameter("start_time");
+                System.out.println("出勤時間　" + start_time);
+                String end_time = request.getParameter("end_time");
+                System.out.println("出勤時間　" + end_time);
+                r.setStart_time(Time.valueOf(start_time + ":00"));
+                r.setEnd_time(Time.valueOf(end_time + ":00"));
+                Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+                r.setCreated_at(currentTime);
+                r.setUpdated_at(currentTime);
+                List<String> errors = ReportValidator.validate(r);
+                if (errors.size() > 0) {
+                    em.close();
+                    request.setAttribute("_token", request.getSession().getId());
+                    request.setAttribute("report", r);
+                    request.setAttribute("errors", errors);
+                    RequestDispatcher rd = request.getRequestDispatcher("/WEB-INF/views/reports/new.jsp");
+                    rd.forward(request, response);
+                } else {
+                    em.getTransaction().begin();
+                    em.persist(r);
+                    em.getTransaction().commit();
+                    em.close();
+                    request.getSession().setAttribute("flush", "登録が完了しました。");
+                    response.sendRedirect(request.getContextPath() + "/reports/index");
+                }
             }
         }
     }
-
+    // 拡張子を変えずに、ランダムな名前のファイルを生成する
+    private String getFileName(Part part) {
+        String[] headerArrays = part.getHeader("Content-Disposition").split(";");
+        String fileName = null;
+        for (String head : headerArrays) {
+            if (head.trim().startsWith("filename")) {
+                fileName = head.substring(head.indexOf('"')).replaceAll("\"", "");
+            }
+        }
+        Timestamp currentTime = new Timestamp(System.currentTimeMillis());
+        String randName = EncryptUtil.getPasswordEncrypt(currentTime.toString(),
+                (String) this.getServletContext().getAttribute("salt"));
+        String extension = fileName.substring(fileName.lastIndexOf("."));
+        fileName = randName + extension;
+        return fileName;
+    }
 }

@@ -56,6 +56,17 @@ public class Report {
     @Column(name = "content", nullable = false)
     private String content;
 
+    @Column(name = "image", length = 255)
+    private String image;
+
+
+    public String getImage() {
+        return image;
+    }
+
+    public void setImage(String image) {
+        this.image = image;
+    }
 
     public Time getStart_time() {
         return start_time;

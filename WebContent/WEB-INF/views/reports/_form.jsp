@@ -26,6 +26,10 @@
 <textarea name="content" rows="10" cols="50">${report.content}</textarea>
 <br /><br />
 
+<label for="image">画像</label><br />
+<input type="file" name="image" value="${report.title}" />
+<br /><br />
+
 <label for="start_time">出勤時間</label><br />
 <input type="time" name="start_time" value="${report.start_time}" />
 <br /><br />
